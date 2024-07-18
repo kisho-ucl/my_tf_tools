@@ -19,9 +19,9 @@ class Robot_hand(Node):
         super().__init__('Robot_hand')
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
         #self.timer = self.create_timer(0.1, self.timer_callback)
-        self.x = 0.0
+        self.x = 1.0
         self.y = 0.0
-        self.z = 1.0
+        self.z = 0.0
         self.rot_x = 0.0
         self.rot_y = 0.0
         self.rot_z = 0.0
@@ -37,8 +37,6 @@ class Robot_hand(Node):
         # MQTT クライアントのループをスレッドで実行
         self.mqtt_thread = Thread(target=self.client.loop_forever)
         self.mqtt_thread.start()
-        self.timer = self.create_timer(0.1, self.publish_tf)
-
 
     def on_message(self, client, userdata, message):
         print("Message Received")
@@ -50,26 +48,10 @@ class Robot_hand(Node):
         self.rot_x = float(nmsg_dict['rot_x']) * np.pi/180
         self.rot_y = float(nmsg_dict['rot_y']) * np.pi/180
         self.rot_z = float(nmsg_dict['rot_z']) * np.pi/180
-
-    def publish_tf(self):
-        t0 = geometry_msgs.msg.TransformStamped()
-        t0.header.stamp = self.get_clock().now().to_msg()
-        t0.header.frame_id = 'map'
-        t0.child_frame_id = 'robot_base'
         
-        t0.transform.translation.x = 0.0 
-        t0.transform.translation.y = 1.0
-        t0.transform.translation.z = 0.0 
-        
-        t0.transform.rotation.x = 0.0
-        t0.transform.rotation.y = 0.0
-        t0.transform.rotation.z = 0.0
-        t0.transform.rotation.w = 1.0
-        self.tf_broadcaster.sendTransform(t0)
-
         t1 = geometry_msgs.msg.TransformStamped()
         t1.header.stamp = self.get_clock().now().to_msg()
-        t1.header.frame_id = 'robot_base'
+        t1.header.frame_id = 'map'
         t1.child_frame_id = 'end_effector'
         
         t1.transform.translation.x = self.x
@@ -86,11 +68,12 @@ class Robot_hand(Node):
         t1.transform.rotation.w = q[3]
         self.tf_broadcaster.sendTransform(t1)
         
+
         # end_effectorからcamera_linkへのTransform
         t2 = geometry_msgs.msg.TransformStamped()
         t2.header.stamp = self.get_clock().now().to_msg()
         t2.header.frame_id = 'end_effector'
-        t2.child_frame_id = 'camera_link_truth'
+        t2.child_frame_id = 'camera_link'
         
         t2.transform.translation.x = 0.0  # x座標
         t2.transform.translation.y = 0.0
@@ -101,6 +84,16 @@ class Robot_hand(Node):
         t2.transform.rotation.z = 0.0
         t2.transform.rotation.w = 1.0
         self.tf_broadcaster.sendTransform(t2)
+        
+
+    def euler_to_quaternion(self, roll, pitch, yaw):
+        # オイラー角をクォータニオンに変換
+        qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+        qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
+        qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
+        qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+        return [qx, qy, qz, qw]
+
 
 def main(args=None):
     rclpy.init(args=args)
